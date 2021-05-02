@@ -10,7 +10,7 @@ RUN set -xe \
             sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/' /etc/apk/repositories ; \
             fi \
     &&  apk update \
-    &&  apk --no-cache --virtual add uthash-dev \
+    &&  apk add --no-cache uthash-dev \
             git \
             gcc \
             libc-dev \
@@ -26,11 +26,15 @@ RUN set -xe \
             geoip-dev \
             python3 \
             py3-pip \
+            libmaxminddb \
+            libmaxminddb-dev \
     &&  if [ ${CHANGE_SOURCE} = true ]; then \
             pip3 config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple ; \
         fi \
     &&  pip3 install lastversion
 RUN set -xe \
+    &&  git clone https://github.com/leev/ngx_http_geoip2_module.git \
+    &&  (git clone https://github.com/google/ngx_brotli.git && cd ngx_brotli && git submodule update --init) \ 
     &&  (cd ngx_waf && git clone https://github.com/client9/libinjection.git inc/libinjection) \
     &&  ngx_version=$(lastversion nginx:stable) \
     &&  lastversion -d "nginx-${ngx_version}.tar.gz" nginx:stable \
@@ -81,9 +85,12 @@ RUN set -xe \
         --with-cc-opt='-Os -fomit-frame-pointer -fstack-protector' \
         --with-ld-opt=-Wl,--as-needed \
         --add-module=/usr/local/src/ngx_waf \
+        --add-module=/usr/local/src/ngx_http_geoip2_module \
+        --add-module=/usr/local/src/ngx_brotli \
     &&  make -j$(nproc)\
     &&  cp objs/nginx /usr/sbin/nginx
 
 FROM nginx:stable-alpine
 COPY ./rules /etc/nginx/waf-rules
 COPY --from=builder /usr/sbin/nginx /usr/sbin/
+RUN set -xe && apk update && apk add --no-cache libmaxminddb libmaxminddb-dev

@@ -28,11 +28,15 @@ RUN set -xe \
             uthash-dev \
             python3 \
             python3-pip \
+            libmaxminddb0 \
+            libmaxminddb-dev \
     &&  if [ ${CHANGE_SOURCE} == true ] ; then \
             pip3 config set global.index-url https://mirrors.cloud.tencent.com/pypi/simple ; \
         fi \
     &&  pip3 install lastversion
 RUN set -xe \
+    &&  git clone https://github.com/leev/ngx_http_geoip2_module.git \
+    &&  (git clone https://github.com/google/ngx_brotli.git && cd ngx_brotli && git submodule update --init) \ 
     &&  (cd ngx_waf && git clone https://github.com/client9/libinjection.git inc/libinjection) \
     &&  ngx_version=$(lastversion nginx:stable) \
     &&  lastversion -d "nginx-${ngx_version}.tar.gz" nginx:stable \
@@ -83,9 +87,12 @@ RUN set -xe \
         --with-cc-opt='-Os -fomit-frame-pointer -fstack-protector' \
         --with-ld-opt=-Wl,--as-needed \
         --add-module=/usr/local/src/ngx_waf \
+        --add-module=/usr/local/src/ngx_http_geoip2_module \
+        --add-module=/usr/local/src/ngx_brotli \
     &&  make -j$(nproc) \
     &&  cp objs/nginx /usr/sbin/nginx
 
 FROM nginx:stable
 COPY ./rules /etc/nginx/waf-rules
 COPY --from=builder /usr/sbin/nginx /usr/sbin/
+RUN set -xe && apt-get update && apt-get install libmaxminddb0 libmaxminddb-dev
